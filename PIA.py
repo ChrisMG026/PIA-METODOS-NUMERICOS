@@ -108,3 +108,14 @@ print(f"S1 = {S1}")
 print(f"S2 = {S2}")
 print(f"S3 = {S3}")
 print(f"S4 = {S4}")
+
+# Cálculo de Pi = (1/7) * suma de los dígitos de cada matrícula
+P1 = (1 / 7) * (di1_1 + di2_1 + di3_1 + di4_1 + di5_1 + di6_1 + di7_1)
+P2 = (1 / 7) * (di1_2 + di2_2 + di3_2 + di4_2 + di5_2 + di6_2 + di7_2)
+P3 = (1 / 7) * (di1_3 + di2_3 + di3_3 + di4_3 + di5_3 + di6_3 + di7_3)
+P4 = (1 / 7) * (di1_4 + di2_4 + di3_4 + di4_4 + di5_4 + di6_4 + di7_4)
+
+print(f"P1 = {P1}")
+print(f"P2 = {P2}")
+print(f"P3 = {P3}")
+print(f"P4 = {P4}")
