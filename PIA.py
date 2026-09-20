@@ -3,24 +3,34 @@ from tkinter import messagebox
 
 
 def ln(x):
+    """Calcula ln(x) mediante la serie de Mercator transformada."""
+    # El logaritmo natural solo acepta argumentos positivos.
     if x <= 0:
         raise ValueError("El logaritmo natural solo está definido para x > 0.")
+    # Esta sustitución permite usar la serie atanh(z) con mejor convergencia.
     z = (x - 1) / (x + 1)
     total = 0.0
+    # El primer término de la serie es z/1.
     termino = z
     n = 1
+    # Se acumulan términos hasta que su aporte sea menor que la tolerancia.
     while abs(termino) > 1e-12:
         total += termino / n
+        # La serie usa potencias impares: z/1 + z^3/3 + z^5/5 + ...
         n += 2
         termino *= z * z
+    # La relación ln(x) = 2 * (z + z^3/3 + z^5/5 + ...) completa el cálculo.
     return 2 * total
 
 
 def exp(x):
+    """Calcula exp(x) con la serie de Taylor de e^x."""
     total = 1.0
     termino = 1.0
     n = 1
+    # Se suman los términos 1 + x + x^2/2! + x^3/3! + ...
     while abs(termino) > 1e-12:
+        # Se obtiene el siguiente término usando el anterior, sin factoriales.
         termino *= x / n
         total += termino
         n += 1
@@ -28,34 +38,46 @@ def exp(x):
 
 
 def interpolacion_lagrange(x, nodos, valores):
+    """Estima f(x) con el polinomio que pasa por los puntos dados."""
     resultado = 0.0
     for indice, nodo in enumerate(nodos):
+        # Cada base de Lagrange comienza con el valor f(nodo).
         termino = valores[indice]
         for otro_indice, otro_nodo in enumerate(nodos):
             if indice != otro_indice:
+                # Este cociente hace que la base valga 1 en su nodo y 0 en los demas.
                 termino *= (x - otro_nodo) / (nodo - otro_nodo)
+        # La interpolacion es la suma de todas las bases ponderadas.
         resultado += termino
     return resultado
 
 
 def resolver_c_newton(P1, P2, S3, tolerancia=1e-10, max_iteraciones=100):
     """Resuelve la ecuacion no lineal de C con Newton-Raphson."""
+    # La ecuacion de C contiene P1 + P2 varias veces, por eso se guarda una vez.
     suma_p = P1 + P2
+    # Se elige una aproximacion inicial positiva y razonable para la iteracion.
     aproximacion = max(1.0, suma_p)
     for iteracion in range(1, max_iteraciones + 1):
+        # f(u) = u^3 - (P1 + P2)u^2 + S3u - 5.
         funcion = (
             aproximacion ** 3
             - suma_p * aproximacion ** 2
             + S3 * aproximacion
             - 5
         )
+        # f'(u) es la derivada necesaria para la formula de Newton-Raphson.
         derivada = 3 * aproximacion ** 2 - 2 * suma_p * aproximacion + S3
+        # No se puede dividir entre una derivada nula o practicamente nula.
         if abs(derivada) < 1e-14:
             raise ValueError("La derivada se hizo cero durante Newton-Raphson.")
+        # Formula: u_nuevo = u_actual - f(u_actual) / f'(u_actual).
         nueva_aproximacion = aproximacion - funcion / derivada
+        # Si el cambio ya es pequeño, se considera que se encontro la raiz.
         if abs(nueva_aproximacion - aproximacion) < tolerancia:
             return nueva_aproximacion, iteracion
         aproximacion = nueva_aproximacion
+    # Evita un ciclo indefinido si el metodo no converge.
     raise ValueError("Newton-Raphson no convergio en el limite de iteraciones.")
 
 
