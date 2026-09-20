@@ -2,6 +2,63 @@ import tkinter as tk
 from tkinter import messagebox
 
 
+def ln(x):
+    if x <= 0:
+        raise ValueError("El logaritmo natural solo está definido para x > 0.")
+    z = (x - 1) / (x + 1)
+    total = 0.0
+    termino = z
+    n = 1
+    while abs(termino) > 1e-12:
+        total += termino / n
+        n += 2
+        termino *= z * z
+    return 2 * total
+
+
+def exp(x):
+    total = 1.0
+    termino = 1.0
+    n = 1
+    while abs(termino) > 1e-12:
+        termino *= x / n
+        total += termino
+        n += 1
+    return total
+
+
+def interpolacion_lagrange(x, nodos, valores):
+    resultado = 0.0
+    for indice, nodo in enumerate(nodos):
+        termino = valores[indice]
+        for otro_indice, otro_nodo in enumerate(nodos):
+            if indice != otro_indice:
+                termino *= (x - otro_nodo) / (nodo - otro_nodo)
+        resultado += termino
+    return resultado
+
+
+def resolver_c_newton(P1, P2, S3, tolerancia=1e-10, max_iteraciones=100):
+    """Resuelve la ecuacion no lineal de C con Newton-Raphson."""
+    suma_p = P1 + P2
+    aproximacion = max(1.0, suma_p)
+    for iteracion in range(1, max_iteraciones + 1):
+        funcion = (
+            aproximacion ** 3
+            - suma_p * aproximacion ** 2
+            + S3 * aproximacion
+            - 5
+        )
+        derivada = 3 * aproximacion ** 2 - 2 * suma_p * aproximacion + S3
+        if abs(derivada) < 1e-14:
+            raise ValueError("La derivada se hizo cero durante Newton-Raphson.")
+        nueva_aproximacion = aproximacion - funcion / derivada
+        if abs(nueva_aproximacion - aproximacion) < tolerancia:
+            return nueva_aproximacion, iteracion
+        aproximacion = nueva_aproximacion
+    raise ValueError("Newton-Raphson no convergio en el limite de iteraciones.")
+
+
 def calcular_resultados(matriculas):
     """Calcula M, N, P y S a partir de las matriculas capturadas."""
     M = {
@@ -24,8 +81,8 @@ class Aplicacion(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Métodos numéricos - Matrículas")
-        self.geometry("900x620")
-        self.minsize(720, 500)
+        self.geometry("900x700")
+        self.minsize(720, 600)
         self.configure(bg="#eef2f7")
         self.matriculas = {}
         self.resultados = None
@@ -95,6 +152,40 @@ class Aplicacion(tk.Tk):
         self.resultados = calcular_resultados(self.matriculas)
         self.mostrar_resultados()
 
+    def calcular_documento_a(self):
+        if not self.resultados:
+            return {}
+        _, N, P, S = self.resultados
+        a = P["M1"] + N["M2"]
+        b = S["M2"] ** 0.5
+        c = (P["M3"] ** 2) / P["M4"]
+        d = ln(1 + S["M1"])
+        e = (P["M2"] ** 2) + N["M3"]
+        f = S["M4"] / 10
+        g = exp(N["M1"])
+        h = S["M3"] / (P["M1"] + 1)
+        i = (P["M4"] + S["M2"]) ** 0.5
+        A = (2 / 3) * (P["M1"] ** 3) + (S["M2"] / 2) * (P["M1"] ** 2) + P["M1"]
+        nodos_b = (P["M2"], P["M3"], P["M4"])
+        valores_b = (4, 9, 16)
+        B = interpolacion_lagrange(N["M2"], nodos_b, valores_b)
+        C, iteraciones_c = resolver_c_newton(P["M1"], P["M2"], S["M3"])
+        variables = {
+            "a": {"formula": "P1 + N2", "valor": a},
+            "b": {"formula": "sqrt(S2)", "valor": b},
+            "c": {"formula": "P3^2 / P4", "valor": c},
+            "d": {"formula": "ln(1 + S1)", "valor": d},
+            "e": {"formula": "P2^2 + N3", "valor": e},
+            "f": {"formula": "S4 / 10", "valor": f},
+            "g": {"formula": "exp(N1)", "valor": g},
+            "h": {"formula": "S3 / (P1 + 1)", "valor": h},
+            "i": {"formula": "sqrt(P4 + S2)", "valor": i},
+            "A": {"formula": "(2/3)P1^3 + (S2/2)P1^2 + P1", "valor": A},
+            "B": {"formula": "x=N2; (P2,4), (P3,9), (P4,16)", "valor": B},
+            "C": {"formula": "u^3 - (P1+P2)u^2 + S3u - 5 = 0", "valor": C},
+        }
+        return variables
+
     def agregar_navegacion(self, canvas):
         barra = tk.Frame(self, bg="#172033", height=52)
         barra.place(relx=0, rely=1, relwidth=1, anchor="sw")
@@ -103,6 +194,11 @@ class Aplicacion(tk.Tk):
             bg="#172033", fg="white", relief="flat", padx=18,
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", padx=18, pady=10)
+        tk.Button(
+            barra, text="Documento A: Estado Operativo", command=self.mostrar_documento_a,
+            bg="#172033", fg="white", relief="flat", padx=18,
+            font=("Segoe UI", 10, "bold")
+        ).pack(side="left", pady=10)
         tk.Button(
             barra, text="Operaciones e iteraciones", command=self.mostrar_operaciones,
             bg="#172033", fg="white", relief="flat", padx=18,
@@ -135,6 +231,37 @@ class Aplicacion(tk.Tk):
             canvas.create_line(55, y + 25, 830, y + 25, fill="#d7dee8")
         self.agregar_navegacion(canvas)
 
+    def mostrar_documento_a(self):
+        if not self.resultados:
+            self.mostrar_captura()
+            return
+        self.pantalla_actual = "documento_a"
+        canvas = self.crear_canvas("Documento A: Estado Operativo")
+        variables = self.calcular_documento_a()
+
+        canvas.create_text(50, 90, anchor="w", text="Variable", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(230, 90, anchor="w", text="Fórmula", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(500, 90, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_line(45, 105, 840, 105, fill="#b8c4d3")
+
+        letras = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "A", "B", "C"]
+        for indice, letra in enumerate(letras):
+            y = 140 + indice * 42
+            detalle = variables.get(letra, {"formula": "Pendiente", "valor": "—"})
+            canvas.create_text(50, y, anchor="w", text=letra, font=("Consolas", 12), fill="#172033")
+            canvas.create_text(230, y, anchor="w", text=detalle["formula"], font=("Consolas", 12), fill="#172033")
+            canvas.create_text(500, y, anchor="w", text=str(detalle["valor"]), font=("Consolas", 12), fill="#172033")
+            canvas.create_line(45, y + 18, 840, y + 18, fill="#d7dee8")
+
+        canvas.create_text(
+            50, 590,
+            anchor="w",
+            text="",
+            font=("Segoe UI", 10),
+            fill="#526074"
+        )
+        self.agregar_navegacion(canvas)
+
     def mostrar_operaciones(self):
         if not self.resultados:
             self.mostrar_captura()
@@ -157,6 +284,48 @@ class Aplicacion(tk.Tk):
                 f"     S = {terminos_s} = {S[clave]}",
                 "",
             ])
+
+        a = P["M1"] + N["M2"]
+        b = S["M2"] ** 0.5
+        c = (P["M3"] ** 2) / P["M4"]
+        d = ln(1 + S["M1"])
+        e = (P["M2"] ** 2) + N["M3"]
+        f = S["M4"] / 10
+        g = exp(N["M1"])
+        h = S["M3"] / (P["M1"] + 1)
+        i = (P["M4"] + S["M2"]) ** 0.5
+        B = interpolacion_lagrange(
+            N["M2"],
+            (P["M2"], P["M3"], P["M4"]),
+            (4, 9, 16),
+        )
+        C, iteraciones_c = resolver_c_newton(P["M1"], P["M2"], S["M3"])
+        residuo_c = (
+            C ** 3
+            - (P["M1"] + P["M2"]) * C ** 2
+            + S["M3"] * C
+            - 5
+        )
+        lineas.extend([
+            "Documento A: Estado Operativo",
+            "",
+            f"a = P1 + N2 = {P['M1']:.7f} + {N['M2']:.7f} = {a:.7f}",
+            f"b = sqrt(S2) = sqrt({S['M2']}) = {b:.7f}",
+            f"c = P3^2 / P4 = ({P['M3']:.7f})^2 / {P['M4']:.7f} = {c:.7f}",
+            f"d = ln(1 + S1) = ln(1 + {S['M1']}) = {d:.7f}",
+            f"e = P2^2 + N3 = ({P['M2']:.7f})^2 + {N['M3']:.7f} = {e:.7f}",
+            f"f = S4 / 10 = {S['M4']} / 10 = {f:.7f}",
+            f"g = exp(N1) = exp({N['M1']:.7f}) = {g:.7f}",
+            f"h = S3 / (P1 + 1) = {S['M3']} / ({P['M1']:.7f} + 1) = {h:.7f}",
+            f"i = sqrt(P4 + S2) = sqrt({P['M4']:.7f} + {S['M2']}) = {i:.7f}",
+            "B: interpolacion de Lagrange con x = N2 y los puntos (P2,4), (P3,9), (P4,16)",
+            f"B = {B:.7f}",
+            "C: Newton-Raphson para u^3 - (P1 + P2)u^2 + S3u - 5 = 0",
+            f"C = {C:.7f} despues de {iteraciones_c} iteraciones",
+            f"Residuo de C = {residuo_c:.3e}",
+            "",
+        ])
+
         texto = tk.Text(
             self, bg="white", fg="#172033", font=("Consolas", 11),
             relief="flat", padx=22, pady=18, wrap="none"
