@@ -222,6 +222,11 @@ class Aplicacion(tk.Tk):
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", pady=10)
         tk.Button(
+            barra, text="Documento B: Respuesta bajo carga", command=self.mostrar_documento_b,
+            bg="#172033", fg="white", relief="flat", padx=18,
+            font=("Segoe UI", 10, "bold")
+        ).pack(side="left", pady=10)
+        tk.Button(
             barra, text="Operaciones e iteraciones", command=self.mostrar_operaciones,
             bg="#172033", fg="white", relief="flat", padx=18,
             font=("Segoe UI", 10, "bold")
@@ -262,23 +267,95 @@ class Aplicacion(tk.Tk):
         variables = self.calcular_documento_a()
 
         canvas.create_text(50, 90, anchor="w", text="Variable", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_text(230, 90, anchor="w", text="Fórmula", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_text(500, 90, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_line(45, 105, 840, 105, fill="#b8c4d3")
+        canvas.create_text(220, 90, anchor="w", text="Fórmula", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(700, 90, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_line(45, 105, 1020, 105, fill="#b8c4d3")
 
         letras = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "A", "B", "C"]
         for indice, letra in enumerate(letras):
-            y = 140 + indice * 42
+            y = 130 + indice * 34
             detalle = variables.get(letra, {"formula": "Pendiente", "valor": "—"})
             canvas.create_text(50, y, anchor="w", text=letra, font=("Consolas", 12), fill="#172033")
-            canvas.create_text(230, y, anchor="w", text=detalle["formula"], font=("Consolas", 12), fill="#172033")
-            canvas.create_text(500, y, anchor="w", text=str(detalle["valor"]), font=("Consolas", 12), fill="#172033")
-            canvas.create_line(45, y + 18, 840, y + 18, fill="#d7dee8")
+            canvas.create_text(220, y, anchor="w", text=detalle["formula"], font=("Consolas", 11), fill="#172033")
+            canvas.create_text(700, y, anchor="w", text=str(detalle["valor"]), font=("Consolas", 11), fill="#172033")
+            canvas.create_line(45, y + 16, 1020, y + 16, fill="#d7dee8")
 
         canvas.create_text(
             50, 590,
             anchor="w",
             text="",
+            font=("Segoe UI", 10),
+            fill="#526074"
+        )
+        self.agregar_navegacion(canvas)
+
+    def mostrar_documento_b(self):
+        self.pantalla_actual = "documento_b"
+        canvas = self.crear_canvas("Documento B: Respuesta bajo carga")
+
+        def nueva_raiz_newton(funcion, derivada, inicio, tolerancia=1e-12, max_iter=50):
+            aproximacion = inicio
+            for _ in range(max_iter):
+                valor = funcion(aproximacion)
+                deriv = derivada(aproximacion)
+                if abs(deriv) < 1e-14:
+                    raise ValueError("La derivada se hizo cero durante la iteración.")
+                nueva = aproximacion - valor / deriv
+                if abs(nueva - aproximacion) < tolerancia:
+                    return nueva
+                aproximacion = nueva
+            raise ValueError("No hubo convergencia para la raíz.")
+
+        def f_a1(w):
+            return w ** 3 - 2.1 * w ** 2 + 0.9 * w - 0.08
+
+        def df_a1(w):
+            return 3 * w ** 2 - 4.2 * w + 0.9
+
+        A1 = nueva_raiz_newton(f_a1, df_a1, 0.1)
+        B1 = 2 * ln(3) + 0.5 * ((3 ** 3) - (1 ** 3)) / 3
+        xs = [1, 2, 4, 6]
+        ys = [4.2, 6.1, 9.8, 13.9]
+        media_x = sum(xs) / len(xs)
+        media_y = sum(ys) / len(ys)
+        numerador = sum((x - media_x) * (y - media_y) for x, y in zip(xs, ys))
+        denominador = sum((x - media_x) ** 2 for x in xs)
+        C1 = numerador / denominador
+        D1 = media_y - C1 * media_x
+
+        canvas.create_text(50, 90, anchor="w", text="Modelo:", font=("Segoe UI", 13, "bold"), fill="#172033")
+        canvas.create_text(170, 90, anchor="w", text="R(n) = A1 n^3 + B1 n^2 + C1 n + D1", font=("Consolas", 12), fill="#216e9b")
+
+        detalles = [
+            ("A1", "raíz positiva de w^3 - 2.1w^2 + 0.9w - 0.08 = 0", f"{A1:.10f}"),
+            ("B1", "∫_1^3 (2/x + 0.5x^2) dx = 2ln(3) + 13/3", f"{B1:.10f}"),
+            ("C1", "tendencia lineal global de h(x)", f"{C1:.10f}"),
+            ("D1", "intercepto de la tendencia lineal global", f"{D1:.10f}"),
+        ]
+
+        canvas.create_text(50, 130, anchor="w", text="Coeficiente", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(260, 130, anchor="w", text="Descripción", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(740, 130, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_line(45, 145, 1020, 145, fill="#b8c4d3")
+
+        for indice, (nombre, descripcion, valor) in enumerate(detalles):
+            y = 180 + indice * 60
+            canvas.create_text(50, y, anchor="w", text=nombre, font=("Consolas", 12), fill="#172033")
+            canvas.create_text(260, y, anchor="w", text=descripcion, font=("Consolas", 10), fill="#172033")
+            canvas.create_text(740, y, anchor="w", text=valor, font=("Consolas", 11), fill="#172033")
+            canvas.create_line(45, y + 18, 1020, y + 18, fill="#d7dee8")
+
+        canvas.create_text(
+            50, 660,
+            anchor="w",
+            text="Datos usados para la tendencia lineal global: (1,4.2), (2,6.1), (4,9.8), (6,13.9)",
+            font=("Segoe UI", 10),
+            fill="#526074"
+        )
+        canvas.create_text(
+            50, 600,
+            anchor="w",
+            text="Nota: se usa la tendencia lineal global, por lo que h(x) ≈ C1 x + D1.",
             font=("Segoe UI", 10),
             fill="#526074"
         )
