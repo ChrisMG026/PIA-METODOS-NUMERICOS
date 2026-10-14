@@ -81,6 +81,96 @@ def resolver_c_newton(P1, P2, S3, tolerancia=1e-10, max_iteraciones=100):
     raise ValueError("Newton-Raphson no convergio en el limite de iteraciones.")
 
 
+def calcular_coeficientes_documento_b():
+    """Calcula Ar, Br, Cr y Dr para el modelo de respuesta R(n)."""
+    def funcion(w):
+        return w ** 3 - 2.1 * w ** 2 + 0.9 * w - 0.08
+
+    def derivada(w):
+        return 3 * w ** 2 - 4.2 * w + 0.9
+
+    raiz = 0.1
+    for _ in range(100):
+        valor_derivada = derivada(raiz)
+        if abs(valor_derivada) < 1e-14:
+            raise ValueError("No se pudo calcular Ar: derivada nula.")
+        siguiente = raiz - funcion(raiz) / valor_derivada
+        if abs(siguiente - raiz) < 1e-12:
+            raiz = siguiente
+            break
+        raiz = siguiente
+    else:
+        raise ValueError("No hubo convergencia al calcular Ar.")
+
+    Ar = raiz
+    Br = 2 * ln(3) + 13 / 3
+    nodos = (1, 2, 4, 6)
+    valores = (4.2, 6.1, 9.8, 13.9)
+    media_n = sum(nodos) / len(nodos)
+    media_h = sum(valores) / len(valores)
+    Cr = sum(
+        (nodo - media_n) * (valor - media_h)
+        for nodo, valor in zip(nodos, valores)
+    ) / sum((nodo - media_n) ** 2 for nodo in nodos)
+    Dr = media_h - Cr * media_n
+    return {"Ar": Ar, "Br": Br, "Cr": Cr, "Dr": Dr}
+
+
+def resolver_gauss_jordan(matriz, tolerancia=1e-12, pasos=None):
+    """Resuelve un sistema cuadrado mediante Gauss-Jordan con pivoteo parcial y opcionalmente guarda pasos."""
+    sistema = [fila[:] for fila in matriz]
+    cantidad = len(sistema)
+    for columna in range(cantidad):
+        fila_pivote = max(
+            range(columna, cantidad),
+            key=lambda fila: abs(sistema[fila][columna]),
+        )
+        sistema[columna], sistema[fila_pivote] = sistema[fila_pivote], sistema[columna]
+        pivote = sistema[columna][columna]
+        if abs(pivote) < tolerancia:
+            raise ValueError("El sistema de Documento A no tiene solución única.")
+        sistema[columna] = [valor / pivote for valor in sistema[columna]]
+        for fila in range(cantidad):
+            if fila != columna:
+                factor = sistema[fila][columna]
+                sistema[fila] = [
+                    actual - factor * pivote_actual
+                    for actual, pivote_actual in zip(sistema[fila], sistema[columna])
+                ]
+        if pasos is not None:
+            pasos.append([fila[:] for fila in sistema])
+    return [sistema[fila][-1] for fila in range(cantidad)]
+
+
+def calcular_documento_c(variables_a):
+    """Calcula a_s y b_s con los coeficientes de Documento B y A."""
+    coeficientes = calcular_coeficientes_documento_b()
+    Ar, Br, Cr, Dr = (coeficientes[nombre] for nombre in ("Ar", "Br", "Cr", "Dr"))
+    a_s = Ar * 2 ** 3 + Br * 2 ** 2 + Cr * 2 + Dr
+
+    matriz = [
+        [variables_a[fila]["valor"] for fila in "abc"]
+        + [variables_a["A"]["valor"]],
+        [variables_a[fila]["valor"] for fila in "def"]
+        + [variables_a["B"]["valor"]],
+        [variables_a[fila]["valor"] for fila in "ghi"]
+        + [variables_a["C"]["valor"]],
+    ]
+    x, y, z = resolver_gauss_jordan(matriz)
+    b_s = x + y + z
+    return {
+        "Ar": Ar,
+        "Br": Br,
+        "Cr": Cr,
+        "Dr": Dr,
+        "a_s": a_s,
+        "x": x,
+        "y": y,
+        "z": z,
+        "b_s": b_s,
+    }
+
+
 def calcular_resultados(matriculas):
     """Calcula M, N, P y S a partir de las matriculas capturadas."""
     M = {
@@ -192,6 +282,7 @@ class Aplicacion(tk.Tk):
         valores_b = (4, 9, 16)
         B = interpolacion_lagrange(N["M2"], nodos_b, valores_b)
         C, iteraciones_c = resolver_c_newton(P["M1"], P["M2"], S["M3"])
+        D = interpolacion_lagrange(2.5, (1, 2, 3, 4), (2.8, 4.6, 7.9, 12.5))
         variables = {
             "a": {"formula": "P1 + N2", "valor": a},
             "b": {"formula": "sqrt(S2)", "valor": b},
@@ -205,6 +296,7 @@ class Aplicacion(tk.Tk):
             "A": {"formula": "(2/3)P1^3 + (S2/2)P1^2 + P1", "valor": A},
             "B": {"formula": "x=N2; (P2,4), (P3,9), (P4,16)", "valor": B},
             "C": {"formula": "u^3 - (P1+P2)u^2 + S3u - 5 = 0", "valor": C},
+            "D": {"formula": "x=2.5; tabla de interpolacion", "valor": D},
         }
         return variables
 
@@ -217,12 +309,17 @@ class Aplicacion(tk.Tk):
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", padx=18, pady=10)
         tk.Button(
-            barra, text="Documento A: Estado Operativo", command=self.mostrar_documento_a,
+            barra, text="Documento A", command=self.mostrar_documento_a,
             bg="#172033", fg="white", relief="flat", padx=18,
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", pady=10)
         tk.Button(
-            barra, text="Documento B: Respuesta bajo carga", command=self.mostrar_documento_b,
+            barra, text="Documento B", command=self.mostrar_documento_b,
+            bg="#172033", fg="white", relief="flat", padx=18,
+            font=("Segoe UI", 10, "bold")
+        ).pack(side="left", pady=10)
+        tk.Button(
+            barra, text="Documento C", command=self.mostrar_documento_c,
             bg="#172033", fg="white", relief="flat", padx=18,
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", pady=10)
@@ -266,99 +363,69 @@ class Aplicacion(tk.Tk):
         canvas = self.crear_canvas("Documento A: Estado Operativo")
         variables = self.calcular_documento_a()
 
-        canvas.create_text(50, 90, anchor="w", text="Variable", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_text(220, 90, anchor="w", text="Fórmula", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_text(700, 90, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_line(45, 105, 1020, 105, fill="#b8c4d3")
+        canvas.create_text(100, 90, anchor="w", text="Variable", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(420, 90, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_line(45, 105, 840, 105, fill="#b8c4d3")
 
-        letras = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "A", "B", "C"]
+        letras = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "A", "B", "C", "D"]
         for indice, letra in enumerate(letras):
-            y = 130 + indice * 34
-            detalle = variables.get(letra, {"formula": "Pendiente", "valor": "—"})
-            canvas.create_text(50, y, anchor="w", text=letra, font=("Consolas", 12), fill="#172033")
-            canvas.create_text(220, y, anchor="w", text=detalle["formula"], font=("Consolas", 11), fill="#172033")
-            canvas.create_text(700, y, anchor="w", text=str(detalle["valor"]), font=("Consolas", 11), fill="#172033")
-            canvas.create_line(45, y + 16, 1020, y + 16, fill="#d7dee8")
-
-        canvas.create_text(
-            50, 590,
-            anchor="w",
-            text="",
-            font=("Segoe UI", 10),
-            fill="#526074"
-        )
+            y = 130 + indice * 38
+            canvas.create_text(100, y, anchor="w", text=letra, font=("Consolas", 12), fill="#172033")
+            canvas.create_text(420, y, anchor="w", text=f"{variables[letra]['valor']:.7f}", font=("Consolas", 12), fill="#172033")
+            canvas.create_line(45, y + 18, 840, y + 18, fill="#d7dee8")
         self.agregar_navegacion(canvas)
 
     def mostrar_documento_b(self):
         self.pantalla_actual = "documento_b"
         canvas = self.crear_canvas("Documento B: Respuesta bajo carga")
+        coeficientes = calcular_coeficientes_documento_b()
 
-        def nueva_raiz_newton(funcion, derivada, inicio, tolerancia=1e-12, max_iter=50):
-            aproximacion = inicio
-            for _ in range(max_iter):
-                valor = funcion(aproximacion)
-                deriv = derivada(aproximacion)
-                if abs(deriv) < 1e-14:
-                    raise ValueError("La derivada se hizo cero durante la iteración.")
-                nueva = aproximacion - valor / deriv
-                if abs(nueva - aproximacion) < tolerancia:
-                    return nueva
-                aproximacion = nueva
-            raise ValueError("No hubo convergencia para la raíz.")
+        canvas.create_text(150, 90, anchor="w", text="Variable", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(450, 90, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_line(45, 105, 840, 105, fill="#b8c4d3")
+        for indice, nombre in enumerate(("Ar", "Br", "Cr", "Dr")):
+            y = 145 + indice * 52
+            canvas.create_text(150, y, anchor="w", text=nombre, font=("Consolas", 12), fill="#172033")
+            canvas.create_text(450, y, anchor="w", text=f"{coeficientes[nombre]:.10f}", font=("Consolas", 12), fill="#172033")
+            canvas.create_line(45, y + 20, 840, y + 20, fill="#d7dee8")
+        self.agregar_navegacion(canvas)
 
-        def f_a1(w):
-            return w ** 3 - 2.1 * w ** 2 + 0.9 * w - 0.08
-
-        def df_a1(w):
-            return 3 * w ** 2 - 4.2 * w + 0.9
-
-        A1 = nueva_raiz_newton(f_a1, df_a1, 0.1)
-        B1 = 2 * ln(3) + 0.5 * ((3 ** 3) - (1 ** 3)) / 3
-        xs = [1, 2, 4, 6]
-        ys = [4.2, 6.1, 9.8, 13.9]
-        media_x = sum(xs) / len(xs)
-        media_y = sum(ys) / len(ys)
-        numerador = sum((x - media_x) * (y - media_y) for x, y in zip(xs, ys))
-        denominador = sum((x - media_x) ** 2 for x in xs)
-        C1 = numerador / denominador
-        D1 = media_y - C1 * media_x
-
-        canvas.create_text(50, 90, anchor="w", text="Modelo:", font=("Segoe UI", 13, "bold"), fill="#172033")
-        canvas.create_text(170, 90, anchor="w", text="R(n) = A1 n^3 + B1 n^2 + C1 n + D1", font=("Consolas", 12), fill="#216e9b")
-
-        detalles = [
-            ("A1", "raíz positiva de w^3 - 2.1w^2 + 0.9w - 0.08 = 0", f"{A1:.10f}"),
-            ("B1", "∫_1^3 (2/x + 0.5x^2) dx = 2ln(3) + 13/3", f"{B1:.10f}"),
-            ("C1", "tendencia lineal global de h(x)", f"{C1:.10f}"),
-            ("D1", "intercepto de la tendencia lineal global", f"{D1:.10f}"),
-        ]
-
-        canvas.create_text(50, 130, anchor="w", text="Coeficiente", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_text(260, 130, anchor="w", text="Descripción", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_text(740, 130, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
-        canvas.create_line(45, 145, 1020, 145, fill="#b8c4d3")
-
-        for indice, (nombre, descripcion, valor) in enumerate(detalles):
-            y = 180 + indice * 60
-            canvas.create_text(50, y, anchor="w", text=nombre, font=("Consolas", 12), fill="#172033")
-            canvas.create_text(260, y, anchor="w", text=descripcion, font=("Consolas", 10), fill="#172033")
-            canvas.create_text(740, y, anchor="w", text=valor, font=("Consolas", 11), fill="#172033")
-            canvas.create_line(45, y + 18, 1020, y + 18, fill="#d7dee8")
-
+    def mostrar_documento_c(self):
+        if not self.resultados:
+            self.mostrar_captura()
+            return
+        self.pantalla_actual = "documento_c"
+        canvas = self.crear_canvas("Documento C: Saturación")
+        variables_a = self.calcular_documento_a()
         canvas.create_text(
-            50, 660,
-            anchor="w",
-            text="Datos usados para la tendencia lineal global: (1,4.2), (2,6.1), (4,9.8), (6,13.9)",
-            font=("Segoe UI", 10),
-            fill="#526074"
+            45, 78, anchor="w",
+            text="Coeficientes disponibles del modelo: a_s y b_s",
+            font=("Segoe UI", 13, "bold"), fill="#216e9b"
         )
-        canvas.create_text(
-            50, 600,
-            anchor="w",
-            text="Nota: se usa la tendencia lineal global, por lo que h(x) ≈ C1 x + D1.",
-            font=("Segoe UI", 10),
-            fill="#526074"
-        )
+
+        def calcular():
+            try:
+                valores = calcular_documento_c(variables_a)
+            except ValueError as error:
+                messagebox.showerror("No se pudo calcular Documento C", str(error))
+                return
+            return valores
+
+        try:
+            valores = calcular()
+            filas = (("a_s", valores["a_s"]), ("b_s", valores["b_s"]))
+        except (TypeError, KeyError):
+            filas = (("a_s", "No disponible"), ("b_s", "No disponible"))
+
+        canvas.create_text(150, 100, anchor="w", text="Variable", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_text(450, 100, anchor="w", text="Valor", font=("Segoe UI", 11, "bold"), fill="#216e9b")
+        canvas.create_line(45, 115, 840, 115, fill="#b8c4d3")
+        for indice, (nombre, valor) in enumerate(filas):
+            y = 155 + indice * 52
+            texto_valor = f"{valor:.7f}" if isinstance(valor, (int, float)) else valor
+            canvas.create_text(150, y, anchor="w", text=nombre, font=("Consolas", 12), fill="#172033")
+            canvas.create_text(450, y, anchor="w", text=texto_valor, font=("Consolas", 12), fill="#172033")
+            canvas.create_line(45, y + 20, 840, y + 20, fill="#d7dee8")
         self.agregar_navegacion(canvas)
 
     def mostrar_operaciones(self):
@@ -368,8 +435,25 @@ class Aplicacion(tk.Tk):
         self.pantalla_actual = "operaciones"
         canvas = self.crear_canvas("Operaciones e iteraciones")
         M, N, P, S = self.resultados
+        variables_a = self.calcular_documento_a()
+        variables_c = calcular_documento_c(variables_a)
+        _, iteraciones_c = resolver_c_newton(P["M1"], P["M2"], S["M3"])
+        residuo_c = (
+            variables_a["C"]["valor"] ** 3
+            - (P["M1"] + P["M2"]) * variables_a["C"]["valor"] ** 2
+            + S["M3"] * variables_a["C"]["valor"]
+            - 5
+        )
+        matriz_c = [
+            [variables_a[fila]["valor"] for fila in "abc"] + [variables_a["A"]["valor"]],
+            [variables_a[fila]["valor"] for fila in "def"] + [variables_a["B"]["valor"]],
+            [variables_a[fila]["valor"] for fila in "ghi"] + [variables_a["C"]["valor"]],
+        ]
+        pasos_gauss = []
+        resolver_gauss_jordan(matriz_c, pasos=pasos_gauss)
         lineas = [
-            "Iteración de captura: se validaron 4 matrículas, todas distintas y de 7 dígitos.",
+            "DATOS DE MATRÍCULAS",
+            "Validación: cuatro matrículas distintas de siete dígitos.",
             "",
         ]
         for clave in ("M1", "M2", "M3", "M4"):
@@ -378,60 +462,78 @@ class Aplicacion(tk.Tk):
             terminos_s = " + ".join(f"{pos}({digito})" for pos, digito in enumerate(digitos, start=1))
             lineas.extend([
                 f"{clave}: M = int({''.join(str(digito) for digito in digitos)}) = {M[clave]}",
-                f"     N = M / 10^7 = {M[clave]} / 10000000 = {N[clave]:.7f}",
-                f"     P = (1/7) * ({suma_digitos}) = {P[clave]:.7f}",
-                f"     S = {terminos_s} = {S[clave]}",
+                f"  N = M / 10^7 = {M[clave]} / 10000000 = {N[clave]:.7f}",
+                f"  P = (1/7)({suma_digitos}) = {P[clave]:.7f}",
+                f"  S = {terminos_s} = {S[clave]}",
                 "",
             ])
 
-        a = P["M1"] + N["M2"]
-        b = S["M2"] ** 0.5
-        c = (P["M3"] ** 2) / P["M4"]
-        d = ln(1 + S["M1"])
-        e = (P["M2"] ** 2) + N["M3"]
-        f = S["M4"] / 10
-        g = exp(N["M1"])
-        h = S["M3"] / (P["M1"] + 1)
-        i = (P["M4"] + S["M2"]) ** 0.5
-        B = interpolacion_lagrange(
-            N["M2"],
-            (P["M2"], P["M3"], P["M4"]),
-            (4, 9, 16),
-        )
-        C, iteraciones_c = resolver_c_newton(P["M1"], P["M2"], S["M3"])
-        residuo_c = (
-            C ** 3
-            - (P["M1"] + P["M2"]) * C ** 2
-            + S["M3"] * C
-            - 5
-        )
+        lineas.extend(["DOCUMENTO A: ESTADO OPERATIVO", ""])
         lineas.extend([
-            "Documento A: Estado Operativo",
-            "",
-            f"a = P1 + N2 = {P['M1']:.7f} + {N['M2']:.7f} = {a:.7f}",
-            f"b = sqrt(S2) = sqrt({S['M2']}) = {b:.7f}",
-            f"c = P3^2 / P4 = ({P['M3']:.7f})^2 / {P['M4']:.7f} = {c:.7f}",
-            f"d = ln(1 + S1) = ln(1 + {S['M1']}) = {d:.7f}",
-            f"e = P2^2 + N3 = ({P['M2']:.7f})^2 + {N['M3']:.7f} = {e:.7f}",
-            f"f = S4 / 10 = {S['M4']} / 10 = {f:.7f}",
-            f"g = exp(N1) = exp({N['M1']:.7f}) = {g:.7f}",
-            f"h = S3 / (P1 + 1) = {S['M3']} / ({P['M1']:.7f} + 1) = {h:.7f}",
-            f"i = sqrt(P4 + S2) = sqrt({P['M4']:.7f} + {S['M2']}) = {i:.7f}",
-            "B: interpolacion de Lagrange con x = N2 y los puntos (P2,4), (P3,9), (P4,16)",
-            f"B = {B:.7f}",
-            "C: Newton-Raphson para u^3 - (P1 + P2)u^2 + S3u - 5 = 0",
-            f"C = {C:.7f} despues de {iteraciones_c} iteraciones",
-            f"Residuo de C = {residuo_c:.3e}",
+            f"a = P1 + N2 = {P['M1']:.7f} + {N['M2']:.7f} = {variables_a['a']['valor']:.7f}",
+            f"b = sqrt(S2) = sqrt({S['M2']}) = {variables_a['b']['valor']:.7f}",
+            f"c = P3^2 / P4 = {P['M3']:.7f}^2 / {P['M4']:.7f} = {variables_a['c']['valor']:.7f}",
+            f"d = ln(1 + S1) = ln(1 + {S['M1']}) = {variables_a['d']['valor']:.7f}",
+            f"e = P2^2 + N3 = {P['M2']:.7f}^2 + {N['M3']:.7f} = {variables_a['e']['valor']:.7f}",
+            f"f = S4 / 10 = {S['M4']} / 10 = {variables_a['f']['valor']:.7f}",
+            f"g = exp(N1) = exp({N['M1']:.7f}) = {variables_a['g']['valor']:.7f}",
+            f"h = S3 / (P1 + 1) = {S['M3']} / ({P['M1']:.7f} + 1) = {variables_a['h']['valor']:.7f}",
+            f"i = sqrt(P4 + S2) = sqrt({P['M4']:.7f} + {S['M2']}) = {variables_a['i']['valor']:.7f}",
+            f"A = (2/3)P1^3 + (S2/2)P1^2 + P1 = {variables_a['A']['valor']:.7f}",
+            "B = interpolación de Lagrange con x=N2 y los nodos P2, P3, P4:",
+            f"  valores tabulados (4, 9, 16); B = {variables_a['B']['valor']:.7f}",
+            "C = raíz por Newton-Raphson de F(u)=u^3-(P1+P2)u^2+S3u-5=0.",
+            f"  F'(u)=3u^2-2(P1+P2)u+S3; C={variables_a['C']['valor']:.7f}",
+            f"  Iteraciones={iteraciones_c}; residuo F(C)={residuo_c:.3e}",
+            "D = interpolación de Lagrange evaluada en x=2.5 con (1,2.8), (2,4.6), (3,7.9), (4,12.5):",
+            f"  D = {variables_a['D']['valor']:.7f}",
             "",
         ])
 
+        coeficientes_b = calcular_coeficientes_documento_b()
+        lineas.extend([
+            "DOCUMENTO B: RESPUESTA BAJO CARGA",
+            "",
+            "Ar: Newton-Raphson en w^3 - 2.1w^2 + 0.9w - 0.08 = 0.",
+            f"  Ar = {coeficientes_b['Ar']:.10f}",
+            "Br: integral de 1 a 3 de (2/x + 0.5x^2) dx = 2ln(3) + 13/3.",
+            f"  Br = {coeficientes_b['Br']:.10f}",
+            "Cr y Dr: tendencia lineal global con (1,4.2), (2,6.1), (4,9.8), (6,13.9).",
+            f"  Cr = {coeficientes_b['Cr']:.10f}; Dr = {coeficientes_b['Dr']:.10f}",
+            "",
+            "DOCUMENTO C: SATURACIÓN (COEFICIENTES DISPONIBLES)",
+            "",
+            f"a_s = R(2) = Ar(2^3) + Br(2^2) + Cr(2) + Dr = {variables_c['a_s']:.7f}",
+            "Sistema para Gauss-Jordan: ax+by+cz=A; dx+ey+fz=B; gx+hy+iz=C.",
+            "Matriz aumentada:",
+            f"  [{variables_a['a']['valor']:.5f}, {variables_a['b']['valor']:.5f}, {variables_a['c']['valor']:.5f} | {variables_a['A']['valor']:.5f}]",
+            f"  [{variables_a['d']['valor']:.5f}, {variables_a['e']['valor']:.5f}, {variables_a['f']['valor']:.5f} | {variables_a['B']['valor']:.5f}]",
+            f"  [{variables_a['g']['valor']:.5f}, {variables_a['h']['valor']:.5f}, {variables_a['i']['valor']:.5f} | {variables_a['C']['valor']:.5f}]",
+            "Matrices tras cada pivote de Gauss-Jordan:",
+            *[
+                f"  Paso {indice}: " + " ; ".join(
+                    "[" + ", ".join(f"{valor:.5f}" for valor in fila) + "]"
+                    for fila in paso
+                )
+                for indice, paso in enumerate(pasos_gauss, start=1)
+            ],
+            f"Solución: x={variables_c['x']:.7f}, y={variables_c['y']:.7f}, z={variables_c['z']:.7f}.",
+            f"b_s = x + y + z = {variables_c['b_s']:.7f}",
+            "",
+        ])
+
+        contenedor = tk.Frame(self, bg="white")
+        contenedor.place(relx=0.05, rely=0.13, relwidth=0.9, relheight=0.78)
         texto = tk.Text(
-            self, bg="white", fg="#172033", font=("Consolas", 11),
-            relief="flat", padx=22, pady=18, wrap="none"
+            contenedor, bg="white", fg="#172033", font=("Consolas", 10),
+            relief="flat", padx=18, pady=14, wrap="word"
         )
         texto.insert("1.0", "\n".join(lineas))
         texto.configure(state="disabled")
-        texto.place(relx=0.05, rely=0.17, relwidth=0.9, relheight=0.68)
+        scrollbar = tk.Scrollbar(contenedor, command=texto.yview)
+        texto.configure(yscrollcommand=scrollbar.set)
+        texto.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
         self.agregar_navegacion(canvas)
 
 
