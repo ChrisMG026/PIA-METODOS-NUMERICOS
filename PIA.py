@@ -5,6 +5,7 @@ from tkinter import filedialog, messagebox
 from html import escape
 from pathlib import Path
 
+#código de funciones matemáticas y de cálculo de documentos
 
 def ln(x):
     """Calcula ln(x) mediante la serie de Mercator transformada."""
