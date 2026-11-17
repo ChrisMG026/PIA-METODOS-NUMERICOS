@@ -24,7 +24,7 @@ Si una matrícula no cumple el formato, aparece un mensaje para corregirla. Si a
   - **S base** es la suma que da más peso a los dígitos ubicados al final.
 - **Documentos** contiene las vistas A–G y **Operaciones detalladas**.
 - En cada documento A–G, la tabla muestra el resultado y una explicación breve. Las claves técnicas se conservan para relacionar las cifras con las ecuaciones del expediente.
-- **Análisis y gráficas** compara la respuesta, la temperatura y el índice general al usar distintos tamaños de paso. En las gráficas, el eje horizontal representa el tiempo.
+- **Análisis y gráficas** compara la respuesta y la temperatura al usar distintos tamaños de paso de Runge-Kutta 4. Si el modelo térmico no llega al final, muestra hasta dónde pudo calcularse y deja el índice general como no disponible.
 - Las tablas anchas se pueden recorrer con la barra de desplazamiento horizontal.
 - **Exportar informe** permite guardar tablas, supuestos, análisis de sensibilidad y gráficas en un archivo HTML.
 - **Nueva captura** permite ingresar otra instancia del equipo.
@@ -35,10 +35,10 @@ Para producir el entregable PDF, abre el HTML guardado en un navegador y selecci
 
 ## Supuestos que deben conservarse en el reporte
 
-- \(\theta(0)=25\,^\circ\mathrm C\) se propone como temperatura ambiente/de reposo previa al inicio de la carga.
+- \(\theta(0)=25\,^\circ\mathrm C\) es una condición inicial propuesta como temperatura ambiente/de reposo previa a la carga; declárala y justifícala en el reporte y úsala en todas las comparaciones.
 - En la ecuación F transcrita, el término \(-Y/\xi\) reduce θ; no debe reportarse como generación de calor que eleva la temperatura.
-- \(\omega=\kappa\) se usa porque el PDF no proporciona un valor separado para \(\omega\).
-- La ecuación térmica del expediente diverge con datos típicos. Para obtener una trayectoria finita, el programa aplica el factor \(\lambda\) descrito en el manual técnico, limitando la fuente a 80 % de la capacidad logística. Esta corrección no aparece en el PDF y debe mencionarse como una decisión del equipo.
+- \(\kappa=L(3)\) se calcula con los coeficientes del Documento D; \(\omega\) se obtiene con Simpson 3/8 a partir de la tabla correspondiente.
+- La ecuación F se conserva sin normalización. Para estas matrículas la trayectoria no alcanza un valor finito en todo el intervalo, por lo que G y el índice general aparecen como no disponibles. No se debe reemplazar ese estado por una cifra calculada con una ecuación modificada.
 - Para el índice G se usa la menor raíz real positiva del modelo de saturación.
 
-El usuario debe incluir estas decisiones y sus razones en el manual técnico y no presentar la normalización térmica como parte original del expediente.
+El informe técnico muestra el diagnóstico y el tiempo aproximado donde se detuvo F para que la limitación sea explícita.

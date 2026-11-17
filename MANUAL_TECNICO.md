@@ -16,13 +16,13 @@ La aplicación ordena las matrículas de menor a mayor antes de asignarles M1–
 Todos los métodos numéricos empleados se implementan en `PIA.py`:
 
 - Series de Mercator transformada para \(\ln(x)\) y de Taylor para \(\exp(x)\), con tolerancia de término \(10^{-12}\).
-- Interpolación de Lagrange.
-- Newton–Raphson para C y \(A_r\), con historial de aproximaciones.
+- Interpolación de Lagrange para nodos no equidistantes y Newton hacia adelante para tablas equidistantes.
+- Newton–Raphson para C y aislamiento/bisección de raíces reales para los polinomios, con criterio explícito de selección de la menor raíz positiva para \(A_r\).
 - Mínimos cuadrados para las pendientes globales \(C_r\), \(k\) y \(\chi\).
 - Eliminación de Gauss–Jordan con pivoteo parcial para los sistemas de C.
 - Regla del trapecio compuesta, Simpson 1/3 y Simpson 3/8.
 - Bisección para \(n\), con tolerancia \(10^{-10}\), intervalo abierto \(1<n<3\) y registro de iteraciones.
-- Euler hacia adelante para las EDO de D, E y F. En E y F se conserva el historial completo \((t,y)\).
+- Runge-Kutta de cuarto orden para las EDO de D, E y F. En E y F se conserva el historial \((t,y)\); F conserva el historial parcial si la integración deja de ser finita.
 - Aislamiento por intervalos y bisección de las raíces reales de la cúbica de saturación.
 
 ## Reconstrucción de los documentos
@@ -41,34 +41,25 @@ Se calculan \(a_s=R(2)\), \(b_s=x+y+z\) mediante el sistema 3×3 recuperado, \(c
 
 ### D — Balance acumulado
 
-La pendiente global \(k\) usa los puntos \((1,2.0),(3,5.3),(5,8.9),(7,12.2)\). También se calculan \(m\) con Simpson 1/3, \(n\) con bisección en \(1<n<3\), \(p\) con Euler desde \(y(0)=1\) y paso 0.1 hasta \(t=1.5\), y \(q\) con Lagrange en \(r=4.5\).
+La pendiente global \(k\) usa los puntos \((1,2.0),(3,5.3),(5,8.9),(7,12.2)\). También se calculan \(m\) con Simpson 1/3, \(n\) con bisección en \(1<n<3\), \(p\) con Runge-Kutta 4 desde \(y(0)=1\) y paso 0.1 hasta \(t=1.5\), y \(q\) con Newton hacia adelante en \(r=4.5\), pues la tabla de q tiene espaciamiento uniforme. Finalmente \(L(3)=k(3)^4+m(3)^3+n(3)^2+p(3)+q\) alimenta el parámetro \(\kappa\) de E.
 
 ### E — Dinámica del rendimiento
 
-Se elige \(r_\sigma=1.2\), la menor raíz positiva de \(r^2-5.2r+4.8=0\), y se calcula \(\sigma=r_\sigma/10\). La ecuación se integra de 0 a 3 con Euler y paso 0.1; \(Y(0)=R(1.8)+x\).
+Se elige \(r_\sigma=1.2\), la menor raíz positiva de \(r^2-5.2r+4.8=0\), y se calcula \(\sigma=r_\sigma/10\). Se usa \(\kappa=L(3)\) del Documento D y \(\omega\) es el área de la tabla \(v(t)\) en \([0,3]\), calculada con Simpson 3/8. La ecuación se integra de 0 a 3 con Runge-Kutta 4 y paso 0.1; \(Y(0)=R(1.8)+x\).
 
 **Supuesto declarado:** el expediente no da un valor independiente para \(\omega\). Se conserva la interpretación del código de trabajo, \(\omega=\kappa=L(3)\), así que \(\kappa/\omega=1\). Debe confirmarse este supuesto con el docente.
 
 ### F — Comportamiento térmico
 
-Se calcula \(\chi\) por mínimos cuadrados, \(\psi=8\) como raíz mayor de \(r^2-11r+24=0\), y \(\xi=a+d+g\) del Documento A. Se propone \(\theta(0)=25\,^\circ\mathrm C\), como temperatura ambiente o de reposo antes de iniciar la carga de trabajo. Se integra hasta \(t=3\) con Euler y paso 0.1.
+Se calcula \(\chi\) por mínimos cuadrados, \(\psi=8\) como raíz mayor de \(r^2-11r+24=0\), y \(\xi=a+d+g\) del Documento A. Como el PDF no contiene una condición inicial legible para \(\theta\), se propone \(\theta(0)=25\,^\circ\mathrm C\), como temperatura ambiente o de reposo antes de iniciar la carga de trabajo. Se integra con Runge-Kutta 4 hasta \(t=3\) y paso 0.1; esta misma condición se usa en los análisis comparativos.
 
-**Corrección explícita respecto del expediente:** la ecuación transcrita, \(\theta'=\chi\theta(\psi-\theta)-Y/\xi\), da divergencia para entradas típicas: \(Y/\xi\) supera la capacidad logística máxima \(\chi\psi^2/4\). La integración directa produce temperaturas no finitas antes de completar el intervalo, por lo que tampoco existe un valor numérico válido de \(\theta(1)\) para G.
+La ecuación original se conserva literalmente: \(\theta'=\chi\theta(\psi-\theta)-Y/\xi\). Se usa Runge-Kutta 4 y la trayectoria Y(t) del Documento E se interpola linealmente en cada etapa; \(\chi\), \(\psi\) y \(\xi\) son coeficientes constantes reconstruidos de sus datos de origen. La capacidad máxima del término logístico es \(\chi\psi^2/4\). Si \(Y/\xi\) supera ese máximo durante todo el intervalo, la derivada neta es negativa para cualquier \(\theta\); al caer \(\theta\) bajo cero, el término logístico también es negativo y la magnitud puede crecer hasta que RK4 deja de obtener valores finitos. El programa reporta esa explicación y el instante aproximado del fallo, sin inventar una temperatura final.
 
-El signo negativo de \(Y/\xi\) hace que ese término reduzca la temperatura en la ecuación transcrita; por ello, no se debe describir como un término que eleva la temperatura. La condición inicial de 25 °C representa el estado previo a la carga, no una conclusión sobre el signo del cambio posterior.
-
-Para conservar la condición inicial propuesta y obtener una trayectoria finita, el programa normaliza la fuente:
-
-\[
-\theta'=\chi\theta(\psi-\theta)-\frac{Y}{\xi\lambda},\qquad
-\lambda=\max\left(1,\frac{\max_t(Y(t)/\xi)}{0.8\,\chi\psi^2/4}\right).
-\]
-
-El factor \(\lambda\) limita la fuente al 80 % de la capacidad logística máxima, dejando un margen numérico del 20 %. Este factor y el margen son una decisión de modelado añadida por el equipo, no datos del PDF. Deben reportarse como desviación y validarse con el docente antes de entregar resultados como si provinieran literalmente del expediente.
+El signo negativo de \(Y/\xi\) hace que ese término reduzca la temperatura en la ecuación transcrita; no debe describirse como generación de calor que eleva la temperatura. La condición inicial de \(25\,^\circ\mathrm C\) es una propuesta justificada por el equipo, no un dato recuperado del PDF.
 
 ### G — Índice de estabilidad
 
-Se resuelve \(a_sU^3-b_sU^2+c_sU-d_s=0\). Si hay varias raíces reales positivas, \(U^*\) es la menor; se declara este criterio porque el expediente no especifica cuál solución operativa elegir. La integral de \(Y(t)\) en \([0,2]\) se calcula con Simpson 1/3 usando la trayectoria de E; \(\theta(1)\) se obtiene interpolando la trayectoria de F. Finalmente:
+Se resuelve \(a_sU^3-b_sU^2+c_sU-d_s=0\). Si hay varias raíces reales positivas, \(U^*\) es la menor. La integral de \(Y(t)\) en \([0,2]\) se calcula con Simpson 1/3 usando la trayectoria de E; \(\theta(1)\) se obtiene de la trayectoria de F. El índice solo se calcula si \(\theta(1)\) es finita. En esta instancia F diverge antes de \(t=1\), así que G y el índice no están disponibles; no se modifica F para forzar un resultado.
 
 \[
 S=\tfrac12\int_0^2Y(t)\,dt+\tfrac13\theta(1)+\ln(1+U^*).
@@ -76,7 +67,7 @@ S=\tfrac12\int_0^2Y(t)\,dt+\tfrac13\theta(1)+\ln(1+U^*).
 
 ## Validación y sensibilidad
 
-La pantalla **Análisis y gráficas** y el informe generado comparan Euler con \(h=0.1,0.05,0.025\), muestran las diferencias consecutivas de \(S\) y repiten Newton–Raphson para C con tolerancias \(10^{-6},10^{-8},10^{-10}\). Las gráficas se construyen directamente desde las trayectorias calculadas, no desde datos externos.
+La pantalla **Análisis y gráficas** y el informe comparan Runge-Kutta 4 con \(h=0.1,0.05,0.025\), muestran las diferencias consecutivas cuando G está disponible, registran el estado/tiempo de fallo de F y repiten Newton–Raphson para C con tolerancias \(10^{-6},10^{-8},10^{-10}\). Las gráficas se construyen desde las trayectorias calculadas; F puede mostrarse parcialmente.
 
 El menú **Operaciones detalladas** presenta sumatorias, iteraciones de Newton y bisección, matrices intermedias de Gauss–Jordan, resultados y supuestos. El botón **Exportar informe** guarda un HTML reproducible con tablas y gráficas SVG; se puede imprimir desde el navegador como PDF.
 
@@ -84,8 +75,7 @@ El HTML exportado incluye las matrículas de la instancia, resultados A–G, sen
 
 ## Limitaciones que deben reportarse
 
-1. El expediente no especifica \(\omega\); el programa usa \(\omega=\kappa\).
-2. La ecuación F requiere la normalización \(\lambda\) descrita para evitar divergencia. Es un supuesto añadido.
-3. La condición inicial \(\theta(0)=25\,^\circ\mathrm C\) es propuesta por el equipo, no recuperada del archivo.
-4. La selección de la menor raíz positiva para \(U^*\) es un criterio documentado, no una selección conservada en el expediente.
-5. Las soluciones de Euler dependen de \(h\); el informe muestra una comparación, no una cota rigurosa del error global.
+1. La condición inicial \(\theta(0)=25\,^\circ\mathrm C\) es propuesta por el equipo, no recuperada del archivo.
+2. La selección de la menor raíz positiva para \(U^*\) es un criterio documentado para resolver la ambigüedad de selección.
+3. La integración RK4 depende del paso \(h\); la comparación de pasos es un análisis empírico de sensibilidad, no una cota rigurosa del error global.
+4. Conservar F sin normalización impide obtener G para esta instancia; cualquier resultado numérico de G requeriría justificar un cambio del modelo con el docente y el expediente.
