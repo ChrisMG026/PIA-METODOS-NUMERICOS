@@ -20,7 +20,7 @@ Todos los métodos numéricos empleados se implementan en `PIA.py`:
 - Newton–Raphson para C y aislamiento/bisección de raíces reales para los polinomios, con criterio explícito de selección de la menor raíz positiva para \(A_r\).
 - Mínimos cuadrados para las pendientes globales \(C_r\), \(k\) y \(\chi\).
 - Eliminación de Gauss–Jordan con pivoteo parcial para los sistemas de C.
-- Regla del trapecio compuesta, Simpson 1/3 y Simpson 3/8.
+- Simpson 1/3 compuesto (sobre funciones y sobre tablas) y Simpson 3/8.
 - Bisección para \(n\), con tolerancia \(10^{-10}\), intervalo abierto \(1<n<3\) y registro de iteraciones.
 - Runge-Kutta de cuarto orden para las EDO de D, E y F. En E y F se conserva el historial \((t,y)\); F conserva el historial parcial si la integración deja de ser finita.
 - Aislamiento por intervalos y bisección de las raíces reales de la cúbica de saturación.
@@ -33,11 +33,25 @@ Se calculan las variables \(a,\ldots,i,A,B,C\) con las expresiones y tablas del 
 
 ### B — Respuesta bajo carga
 
-Se calculan \(A_r\) como la menor raíz positiva de la cúbica del expediente, \(B_r\) por la integral indicada, \(C_r\) como pendiente de mínimos cuadrados sobre la tabla recuperada y \(D_r\) por Lagrange en \(x=2.5\).
+Se calculan \(A_r\) como la menor raíz positiva de la cúbica del expediente, \(B_r\) por la integral indicada, \(C_r\) como pendiente de mínimos cuadrados sobre la tabla recuperada y \(D_r\) por Newton hacia adelante en \(x=2.5\), pues la tabla tiene espaciamiento uniforme (el resultado coincide con Lagrange).
 
 ### C — Saturación
 
-Se calculan \(a_s=R(2)\), \(b_s=x+y+z\) mediante el sistema 3×3 recuperado, \(c_s\) con trapecio compuesto en \([0,4]\), y \(d_s=10T_m+3T_c\). \(T_m\) se interpola en 410 y \(T_c\) se evalúa en el parámetro \(a\) del Documento A.
+Se calculan \(a_s=R(2)\), \(b_s=x+y+z\) mediante el sistema 3×3 recuperado, \(c_s\) con Simpson 1/3 compuesto en \([0,4]\), y \(d_s=10T_m+3T_c\). \(T_m\) se interpola en 410 y \(T_c\) se evalúa en el parámetro \(a\) del Documento A.
+
+Para \(c_s\) se usa la tabla \(\ell(t)=(3.0,4.4,6.9,10.1,15.0)\) en \(t=0,1,2,3,4\). Hay \(n=4\) intervalos (par, por lo que Simpson 1/3 compuesto es aplicable) y paso \(h=1\), con pesos \(1,4,2,4,1\):
+
+\[
+\sum_{\text{extremos}}=\ell_0+\ell_4=18,\qquad
+\sum_{\text{impares}}=\ell_1+\ell_3=14.5,\qquad
+\sum_{\text{pares}}=\ell_2=6.9,
+\]
+\[
+\sum_{\text{ponderada}}=18+4(14.5)+2(6.9)=89.8,\qquad
+c_s=\frac{h}{3}\sum_{\text{ponderada}}=\frac{89.8}{3}=29.93333333.
+\]
+
+Este desglose —tabla, \(n\), \(h\), sumatorias y resultado— se muestra en **Operaciones detalladas** y en el informe HTML exportado.
 
 ### D — Balance acumulado
 
@@ -47,7 +61,7 @@ La pendiente global \(k\) usa los puntos \((1,2.0),(3,5.3),(5,8.9),(7,12.2)\). T
 
 Se elige \(r_\sigma=1.2\), la menor raíz positiva de \(r^2-5.2r+4.8=0\), y se calcula \(\sigma=r_\sigma/10\). Se usa \(\kappa=L(3)\) del Documento D y \(\omega\) es el área de la tabla \(v(t)\) en \([0,3]\), calculada con Simpson 3/8. La ecuación se integra de 0 a 3 con Runge-Kutta 4 y paso 0.1; \(Y(0)=R(1.8)+x\).
 
-**Supuesto declarado:** el expediente no da un valor independiente para \(\omega\). Se conserva la interpretación del código de trabajo, \(\omega=\kappa=L(3)\), así que \(\kappa/\omega=1\). Debe confirmarse este supuesto con el docente.
+**Supuesto declarado:** el expediente solo indica «acumulado 0–3» para \(\omega\) junto a la tabla \(v(t)\). Se calcula \(\omega=\int_0^3 v(t)\,dt\) con Simpson 3/8 sobre los cuatro puntos de la tabla, lo que da \(\omega=12\). Por tanto \(\kappa=L(3)\) y \(\omega\) son cantidades distintas y no se identifica \(\kappa/\omega\) con 1.
 
 ### F — Comportamiento térmico
 
@@ -69,7 +83,7 @@ S=\tfrac12\int_0^2Y(t)\,dt+\tfrac13\theta(1)+\ln(1+U^*).
 
 La pantalla **Análisis y gráficas** y el informe comparan Runge-Kutta 4 con \(h=0.1,0.05,0.025\), muestran las diferencias consecutivas cuando G está disponible, registran el estado/tiempo de fallo de F y repiten Newton–Raphson para C con tolerancias \(10^{-6},10^{-8},10^{-10}\). Las gráficas se construyen desde las trayectorias calculadas; F puede mostrarse parcialmente.
 
-El menú **Operaciones detalladas** presenta sumatorias, iteraciones de Newton y bisección, matrices intermedias de Gauss–Jordan, resultados y supuestos. El botón **Exportar informe** guarda un HTML reproducible con tablas y gráficas SVG; se puede imprimir desde el navegador como PDF.
+El menú **Operaciones detalladas** presenta sumatorias, iteraciones de Newton y bisección, matrices intermedias de Gauss–Jordan, el desglose de Simpson 1/3 para \(c_s\), resultados y supuestos. El botón **Exportar informe** guarda un HTML reproducible con tablas y gráficas SVG que incluye ese mismo desglose; se puede imprimir desde el navegador como PDF.
 
 El HTML exportado incluye las matrículas de la instancia, resultados A–G, sensibilidad, validaciones numéricas, interpretación, supuestos y el contenido completo del archivo ejecutable. Imprimir ese HTML a PDF genera el informe técnico asociado a la instancia capturada.
 

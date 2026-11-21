@@ -26,6 +26,65 @@ class PruebasMetodosNumericos(unittest.TestCase):
         with self.assertRaises(ValueError):
             PIA.interpolacion_newton_adelante(2, (1, 2, 4), (1, 2, 3))
 
+    def test_cs_usa_simpson_1_3_compuesto_y_expone_el_desglose(self):
+        modelo = PIA.calcular_modelo(self.matriculas)
+        c_s = modelo["documento_c"]["c_s"]
+        self.assertAlmostEqual(c_s, 89.8 / 3, places=12)
+
+        desglose = modelo["documento_c"]["desglose_c_s"]
+        self.assertEqual(desglose["nodos"], (0, 1, 2, 3, 4))
+        self.assertEqual(desglose["valores"], (3.0, 4.4, 6.9, 10.1, 15.0))
+        self.assertEqual(desglose["num_intervalos"], 4)
+        self.assertEqual(desglose["h"], 1)
+        self.assertAlmostEqual(desglose["suma_extremos"], 18.0, places=12)
+        self.assertAlmostEqual(desglose["suma_impares"], 14.5, places=12)
+        self.assertAlmostEqual(desglose["suma_pares"], 6.9, places=12)
+        self.assertAlmostEqual(desglose["suma_ponderada"], 89.8, places=12)
+        self.assertAlmostEqual(desglose["resultado"], c_s, places=12)
+        self.assertAlmostEqual(
+            PIA.simpson_1_3_tabla(desglose["valores"], desglose["h"]),
+            c_s,
+            places=12,
+        )
+
+    def test_desglose_de_cs_aparece_en_html_y_en_operaciones(self):
+        modelo = PIA.calcular_modelo(self.matriculas)
+        informe = PIA.crear_reporte_html(modelo, self.matriculas)
+        for texto in (
+            "desglose de c_s con Simpson 1/3 compuesto",
+            "Σ extremos (l0 + l4)",
+            "89.8",
+            "29.93333333",
+            "Simpson 1/3 compuesto (sobre funciones y sobre tablas",
+        ):
+            self.assertIn(texto, informe)
+
+        import tkinter as tk
+
+        try:
+            aplicacion = PIA.Aplicacion()
+        except tk.TclError:
+            self.skipTest("Entorno sin interfaz gráfica disponible")
+        try:
+            aplicacion.matriculas = self.matriculas
+            aplicacion.modelo = modelo
+            aplicacion.mostrar_operaciones()
+            area = None
+            for widget in aplicacion.content.winfo_children():
+                for hijo in widget.winfo_children():
+                    if isinstance(hijo, tk.Text):
+                        area = hijo
+            self.assertIsNotNone(area)
+            contenido = area.get("1.0", "end")
+            for texto in (
+                "c_s: Simpson 1/3 compuesto",
+                "Σ ponderada = 18 + 4·14.5 + 2·6.9 = 89.8",
+                "c_s = (h/3)·Σ ponderada = (1/3)·89.8 = 29.93333333",
+            ):
+                self.assertIn(texto, contenido)
+        finally:
+            aplicacion.destroy()
+
     def test_ar_usa_la_menor_raiz_positiva_de_su_cubica(self):
         datos_b = PIA.calcular_coeficientes_documento_b()
         raices_positivas = [raiz for raiz in datos_b["raices_ar"] if raiz > 0]

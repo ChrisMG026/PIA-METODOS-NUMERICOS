@@ -229,11 +229,12 @@ def calcular_documento_c(variables_a, coeficientes_b=None):
     x, y, z = sol_sistema
     b_s = x + y + z
 
-    # c_s: Regla del trapecio compuesta para el acumulado de l(t) de 0 a 4
+    # c_s: Simpson 1/3 compuesto para el acumulado de l(t) de 0 a 4
     t_vals = (0, 1, 2, 3, 4)
     l_vals = (3.0, 4.4, 6.9, 10.1, 15.0)
     h = t_vals[1] - t_vals[0]
-    c_s = (h / 2) * (l_vals[0] + l_vals[-1] + 2 * sum(l_vals[1:-1]))
+    desglose_c_s = desglose_simpson_1_3_tabla(l_vals, h)
+    c_s = desglose_c_s["resultado"]
 
     # d_s = 10 * Tm + 3 * Tc
     nodos_m = (180, 320, 470, 650)
@@ -256,6 +257,7 @@ def calcular_documento_c(variables_a, coeficientes_b=None):
         "Ar": Ar, "Br": Br, "Cr": Cr, "Dr": Dr,
         "a_s": a_s, "x": x, "y": y, "z": z, "b_s": b_s,
         "c_s": c_s, "Tm": Tm, "Tc": Tc, "d_s": d_s,
+        "desglose_c_s": {**desglose_c_s, "nodos": t_vals, "valores": l_vals},
         "pasos_gj": pasos_gj, "pasos_gj_tc": pasos_gj_tc,
         "historial_ar": coeficientes["historial_ar"]
     }
@@ -349,6 +351,37 @@ def simpson_1_3(func, a, b, n):
         x = a + i * h
         suma += (2 if i % 2 == 0 else 4) * func(x)
     return (h / 3) * suma
+
+def desglose_simpson_1_3_tabla(valores, h):
+    """Desglosa Simpson 1/3 compuesto aplicado a una tabla equidistante.
+
+    Devuelve las sumatorias ponderadas y el resultado para poder mostrar todo
+    el proceso en la interfaz y en el informe.
+    """
+    if h <= 0 or len(valores) < 3 or len(valores) % 2 == 0:
+        raise ValueError(
+            "Simpson 1/3 compuesto requiere al menos 3 valores, una cantidad "
+            "impar de valores (par de intervalos) y paso positivo."
+        )
+    extremos = valores[0] + valores[-1]
+    impares = sum(valores[1:-1:2])
+    pares = sum(valores[2:-1:2])
+    suma_ponderada = extremos + 4 * impares + 2 * pares
+    return {
+        "h": h,
+        "num_intervalos": len(valores) - 1,
+        "suma_extremos": extremos,
+        "suma_impares": impares,
+        "suma_pares": pares,
+        "suma_ponderada": suma_ponderada,
+        "resultado": (h / 3) * suma_ponderada,
+    }
+
+
+def simpson_1_3_tabla(valores, h):
+    """Aplica Simpson 1/3 compuesto a valores tabulados con paso constante."""
+    return desglose_simpson_1_3_tabla(valores, h)["resultado"]
+
 
 def simpson_3_8(valores, h):
     if len(valores) != 4 or h <= 0:
@@ -822,7 +855,7 @@ SIGNIFICADOS_B = {
 SIGNIFICADOS_C = {
     "a_s": "Respuesta del modelo bajo carga cuando la entrada vale 2.",
     "b_s": "Suma de las tres incógnitas encontradas al resolver el sistema.",
-    "c_s": "Acumulado de las mediciones entre los tiempos 0 y 4.",
+    "c_s": "Acumulado de las mediciones entre 0 y 4 con Simpson 1/3 compuesto.",
     "d_s": "Combinación de las estimaciones Tm y Tc calculadas con los datos del expediente.",
 }
 
@@ -1082,6 +1115,26 @@ def crear_reporte_html(modelo, matriculas):
             f"<td>{escape(str(descripcion))}</td><td>{valor_html}</td></tr>"
         )
     filas_modelos = "".join(filas_modelos_lista)
+    desglose_cs = c["desglose_c_s"]
+    filas_cs_tabla = "".join(
+        f"<tr><td>{tiempo:g}</td><td>{valor:.4g}</td></tr>"
+        for tiempo, valor in zip(desglose_cs["nodos"], desglose_cs["valores"])
+    )
+    filas_cs_desglose = "".join(
+        f"<tr><td>{escape(etiqueta)}</td><td>{valor}</td></tr>"
+        for etiqueta, valor in (
+            ("Número de intervalos n", str(desglose_cs["num_intervalos"])),
+            ("Paso h", f"{desglose_cs['h']:g}"),
+            ("Σ extremos (l0 + l4)", f"{desglose_cs['suma_extremos']:.10g}"),
+            ("Σ impares (l1 + l3)", f"{desglose_cs['suma_impares']:.10g}"),
+            ("Σ pares internos (l2)", f"{desglose_cs['suma_pares']:.10g}"),
+            (
+                "Σ ponderada = extremos + 4·impares + 2·pares",
+                f"{desglose_cs['suma_ponderada']:.10g}",
+            ),
+            ("c_s = (h/3)·Σ ponderada", f"{desglose_cs['resultado']:.10g}"),
+        )
+    )
     estado_f_texto = "Divergente" if f["estado"] == "divergente" else "Completo"
     estado_f_clase = "badge-danger" if f["estado"] == "divergente" else "badge-success"
     estado_g_texto = "No disponible" if g["estado"] != "completo" else "Calculado"
@@ -1197,6 +1250,12 @@ pre{{margin:12px 0 0;padding:16px;background:#f1f5f8;border:1px solid var(--line
 <table><thead><tr><th>Documento</th><th>Parámetro</th><th>Interpretación</th><th>Resultado</th></tr></thead><tbody>{filas_modelos}</tbody></table>
 </section>
 <section class="report-section">
+<h2>Documento C · desglose de c_s con Simpson 1/3 compuesto</h2><div class="section-rule"></div>
+<p>La tabla l(t) tiene 5 puntos y 4 intervalos, por lo que Simpson 1/3 compuesto es aplicable (n par). Pesos: 1, 4, 2, 4, 1 con paso h = {desglose_cs['h']:g}.</p>
+<table><thead><tr><th>t</th><th>l(t)</th></tr></thead><tbody>{filas_cs_tabla}</tbody></table>
+<table><thead><tr><th>Concepto</th><th>Valor</th></tr></thead><tbody>{filas_cs_desglose}</tbody></table>
+</section>
+<section class="report-section">
 <h2>Trayectorias de respuesta</h2><div class="section-rule"></div>
 <p>Los ejes identifican el tiempo y la magnitud representada. Los puntos indican los pasos de integración. En F, el tramo extremo se recorta solo en la gráfica para conservar visibles los cambios previos; los valores del modelo no se modifican.</p>
 <div class="chart-card">{crear_svg_trayectoria(e["historial"], "Documento E: respuesta del sistema", "#087e8b", "Respuesta Y(t)")}</div>
@@ -1212,7 +1271,7 @@ pre{{margin:12px 0 0;padding:16px;background:#f1f5f8;border:1px solid var(--line
 <section class="report-section">
 <h2>Métodos, criterios y supuestos</h2><div class="section-rule"></div>
 <ul class="method-list">
-<li>Los métodos numéricos se implementan en el código: bisección y aislamiento de raíces polinómicas, Newton-Raphson para C, interpolación de Lagrange y Newton hacia adelante, mínimos cuadrados, Gauss-Jordan con pivoteo, trapecio compuesto, Simpson 1/3 y 3/8, y Runge-Kutta de cuarto orden.</li>
+<li>Los métodos numéricos se implementan en el código: bisección y aislamiento de raíces polinómicas, Newton-Raphson para C, interpolación de Lagrange y Newton hacia adelante, mínimos cuadrados, Gauss-Jordan con pivoteo, Simpson 1/3 compuesto (sobre funciones y sobre tablas, con desglose de sumatorias), Simpson 3/8 y Runge-Kutta de cuarto orden.</li>
 <li>Para el modelo E se selecciona r_sigma = 1.2 entre las raíces admisibles 1.2 y 4.0; se usa la raíz menor para adoptar el decaimiento más conservador.</li>
 <li>Se conserva la asignación del expediente: kappa = L(3), donde L se forma con los coeficientes del Documento D; omega es la integral de la tabla v(t) en [0,3], calculada con Simpson 3/8.</li>
 <li>En F se propone theta(0) = 25 °C como temperatura ambiente/de reposo previa a la carga de trabajo, conforme a la justificación del equipo.</li>
@@ -1227,6 +1286,7 @@ pre{{margin:12px 0 0;padding:16px;background:#f1f5f8;border:1px solid var(--line
 <tr><td>Pendiente k con la tabla del documento D</td><td>{d["k"]:.10g} (referencia manual: 1.71)</td></tr>
 <tr><td>Integral m, polinomio integrado exactamente por Simpson</td><td>{d["m"]:.10g} (valor analítico: 15)</td></tr>
 <tr><td>Residuo de la raíz n de D</td><td>{residuo_n:.3g}</td></tr>
+<tr><td>Acumulado c_s con Simpson 1/3 compuesto</td><td>{c["c_s"]:.10g} (n={desglose_cs["num_intervalos"]}, h={desglose_cs["h"]:g}, Σ ponderada={desglose_cs["suma_ponderada"]:.10g})</td></tr>
 <tr><td>Residuo de Newton-Raphson para C</td><td>{residuo_c:.3g}</td></tr>
 <tr><td>Residuo de la raíz U* de saturación</td><td>{"No disponible: Documento F/G no computable" if residuo_u is None else f"{residuo_u:.3g}"}</td></tr>
 </tbody></table>
@@ -2311,6 +2371,29 @@ class Aplicacion(tk.Tk):
         lineas.extend(
             f"{clave}={val_c[clave]:.10g}" for clave in ("a_s", "b_s", "c_s", "d_s")
         )
+        desglose_cs = val_c["desglose_c_s"]
+        lineas.append(
+            "c_s: Simpson 1/3 compuesto sobre la tabla l(t); "
+            f"n={desglose_cs['num_intervalos']} intervalos de paso "
+            f"h={desglose_cs['h']:g}, pesos 1, 4, 2, 4, 1."
+        )
+        for tiempo, valor in zip(desglose_cs["nodos"], desglose_cs["valores"]):
+            lineas.append(f"  t={tiempo:g}, l(t)={valor:.4g}")
+        lineas.append(
+            f"  Σ extremos (l0+l4)={desglose_cs['suma_extremos']:.10g}; "
+            f"Σ impares (l1+l3)={desglose_cs['suma_impares']:.10g}; "
+            f"Σ pares internos (l2)={desglose_cs['suma_pares']:.10g}"
+        )
+        lineas.append(
+            f"  Σ ponderada = {desglose_cs['suma_extremos']:.10g} "
+            f"+ 4·{desglose_cs['suma_impares']:.10g} "
+            f"+ 2·{desglose_cs['suma_pares']:.10g} "
+            f"= {desglose_cs['suma_ponderada']:.10g}"
+        )
+        lineas.append(
+            f"  c_s = (h/3)·Σ ponderada = ({desglose_cs['h']:g}/3)·"
+            f"{desglose_cs['suma_ponderada']:.10g} = {desglose_cs['resultado']:.10g}"
+        )
         lineas.append(f"Solución de Gauss-Jordan: x={val_c['x']:.8g}, y={val_c['y']:.8g}, z={val_c['z']:.8g}")
         lineas.append(
             f"Tm (Lagrange en 410)={val_c['Tm']:.8g}; "
@@ -2420,6 +2503,7 @@ class Aplicacion(tk.Tk):
             "SUPUESTOS DECLARADOS",
             "• Se usa r_sigma=1.2, la menor raíz positiva, para el decaimiento más conservador.",
             "• kappa se calcula como L(3) a partir de los coeficientes del Documento D; omega se integra con Simpson 3/8 en la tabla indicada.",
+            "• c_s se calcula con Simpson 1/3 compuesto sobre la tabla l(t) (n=4, h=1); el desglose de sumatorias aparece en esta vista y en el informe HTML.",
             "• Se propone theta(0)=25 °C como línea base ambiente/de reposo previa a la carga y se usa en todos los análisis comparativos.",
             "• Se conserva la ecuación F original sin normalización; cuando Y/xi supera la capacidad logística máxima chi*psi²/4, el aporte negativo domina, la trayectoria pierde finitud y G se declara no disponible.",
             "• Para U* se elige la menor raíz real positiva de la ecuación de saturación.",

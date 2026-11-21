@@ -10,7 +10,7 @@
 
 1. Abre una terminal en la carpeta del proyecto.
 2. Ejecuta `python PIA.py`.
-3. Captura cuatro matrículas distintas de exactamente siete dígitos y presiona **Calcular Modelos Numéricos**.
+3. Captura cuatro matrículas distintas de exactamente siete dígitos y presiona **Calcular modelos**.
 4. El programa las ordena automáticamente antes de asignar M1–M4. Conserva los ceros iniciales de la matrícula para mostrarla correctamente.
 
 Si una matrícula no cumple el formato, aparece un mensaje para corregirla. Si algún cálculo numérico no puede completarse, la aplicación muestra el error en lugar de guardar un resultado incompleto.
@@ -22,11 +22,12 @@ Si una matrícula no cumple el formato, aparece un mensaje para corregirla. Si a
   - **N** es ese número convertido a una escala pequeña para el modelo.
   - **P** es el promedio de los siete dígitos.
   - **S base** es la suma que da más peso a los dígitos ubicados al final.
-- **Documentos** contiene las vistas A–G y **Operaciones detalladas**.
+- **VISTA GENERAL** contiene **Resultados base**, **Análisis y gráficas** y **Operaciones detalladas**; **DOCUMENTOS** contiene las vistas A–G.
+- En **Operaciones detalladas** puedes seguir el proceso completo: iteraciones de Newton y bisección, matrices de Gauss-Jordan y el desglose de Simpson 1/3 para \(c_s\) (tabla, \(n\), \(h\), sumatorias y resultado). Ese mismo desglose aparece en el informe HTML.
 - En cada documento A–G, la tabla muestra el resultado y una explicación breve. Las claves técnicas se conservan para relacionar las cifras con las ecuaciones del expediente.
 - **Análisis y gráficas** compara la respuesta y la temperatura al usar distintos tamaños de paso de Runge-Kutta 4. Si el modelo térmico no llega al final, muestra hasta dónde pudo calcularse y deja el índice general como no disponible.
 - Las tablas anchas se pueden recorrer con la barra de desplazamiento horizontal.
-- **Exportar informe** permite guardar tablas, supuestos, análisis de sensibilidad y gráficas en un archivo HTML.
+- **Exportar informe** permite guardar tablas, supuestos, análisis de sensibilidad, el desglose de Simpson 1/3 para \(c_s\) y gráficas en un archivo HTML.
 - **Nueva captura** permite ingresar otra instancia del equipo.
 
 El índice general **S** del Documento G es distinto de la suma ponderada **S base** de las matrículas. El índice general es un valor calculado, no una calificación: el expediente no define límites para decir que el sistema sea «estable» o «inestable», así que no debe interpretarse con esas etiquetas.
